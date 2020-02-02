@@ -31,6 +31,9 @@ __description__ = "A module to use Allocine API V3 in Python"
 
 class allocine(object):
     """An interface to the Allocine API"""
+
+    __forbiddenUserAgents = []
+
     def __init__(self, partner_key='aXBob25lLXYy', secret_key='29d185d98c984a359e6e6f26a0474269'):
         """Init values"""
         self._api_url = 'http://api.allocine.fr/rest/v3'
@@ -98,10 +101,12 @@ class allocine(object):
         tries = 1
         ok = False
         while not ok and tries < triesmax:
+            ua = None
             try:
                 # do the request
                 req = urllib.request.Request(query_url)
-                req.add_header('User-agent', self._get_random_user_agent())
+                ua = self._get_random_user_agent()
+                req.add_header('User-agent', ua)
 
                 str_response = urllib.request.urlopen(req, timeout = 10).readline().decode("utf-8")
                 response = json.loads(str_response)
@@ -109,11 +114,16 @@ class allocine(object):
             except urllib.request.HTTPError as e:
                 #print(e)
                 if e.code == 403:
-                    tries += 1
-                    time.sleep(1)
-                else:
-                    tries = triesmax
+                    self.__forbiddenUserAgents.append(ua)
+                    print('AlloCine API error: UserAgent may be refused!')
+                    print(self.__forbiddenUserAgents)
+                else:	# Other HTTP error codes received so far: 503
+                    pass
+                tries += 1
+                time.sleep(1)
 
+        if not ok and tries == triesmax:
+            print('AlloCine API: maximum retries (%s) reached with no luck!!' %(triesmax))
         return response
 
     def search(self, query, filter="movie"):
